@@ -1,7 +1,4 @@
-#!/usr/bin/env python 
-
-from movevalidator.movevalidator import MoveValidator
-
+from chessmoves.movevalidator import MoveValidator
 
 def main():
     print("-----------------------------------------")
