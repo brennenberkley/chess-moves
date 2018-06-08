@@ -1,5 +1,6 @@
 from chessmoves.movevalidator import MoveValidator
 
+
 def main():
     print("-----------------------------------------")
     print("           Chess PGN Generator           ")
@@ -11,6 +12,7 @@ def main():
         move = input(validator.get_move_number() + " ")
         if not validator.add_move(move):
             print("Invalid move")
+            print(validator.get_board_position())
 
 
 if __name__ == '__main__':
