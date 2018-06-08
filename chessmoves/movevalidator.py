@@ -4,6 +4,7 @@ class MoveValidator:
     _white_can_castle_queenside = True
     _black_can_castle_kingside = True
     _black_can_castle_queenside = True
+    _last_move = ""
 
     # First letter indicates color, second letter indicates piece
     _board_position = [
@@ -32,9 +33,13 @@ class MoveValidator:
         board += "    a    b    c    d    e    f    g    h   \n"
         return board
 
-    def add_move(self, move):
-        # Decode the move
+    def get_last_move(self):
+        return self._last_move
 
+    def add_move(self, move_input):
+        move = move_input
+
+        comment = None
         # strip off extra symbols
         if "??" in move:
             comment = "??"
@@ -52,19 +57,20 @@ class MoveValidator:
         move = move.replace("#", "")
         move = move.replace(" ", "")
 
+        # Handle special cases
         if move == "0-0" or move == "o-o" or move == "O-O":
             return self._castle_kingside()
-
         if move == "0-0-0" or move == "o-o-o" or move == "O-O-O":
             return self._castle_queenside()
 
         if len(move) < 2:
             return False
 
-        file = move[-2:-1]
-        rank = move[-1:]
-        if file not in "abcdefgh" or rank not in "12345678":
+        try:
+            destination = Square(move[-2:])
+        except ValueError:
             return False
+
         move = move[:-2]
 
         piece = "p"
@@ -78,42 +84,119 @@ class MoveValidator:
 
         if len(move) == 1:
             if move in "abcdefgh":
-                origin_file = move
+                origin_file = "abcdefgh".find(move)
             elif move in "12345678":
-                origin_rank = move
+                origin_rank = "12345678".find(move)
             else:
                 return False
-
         elif len(move) == 2:
-            origin_file = move[0]
-            origin_rank = move[1]
-            if origin_file not in "abcdefgh" or origin_rank not in "12345678":
+            try:
+                origin = Square(move)
+                origin_rank = origin.rank
+                origin_file = origin.file
+            except ValueError:
                 return False
 
         # Check for a piece on the destination square
         capture = False
-        r = self._get_index(rank)
-        f = self._get_index(file)
-        if self._board_position[r][f]:
-            if self._board_position[r][f][0] == self.get_color_to_move()[0]:
+        if self._board_position[destination.rank][destination.file]:
+            if self._board_position[destination.rank][destination.file][0] == self.get_color_to_move()[0]:
                 return False
             else:
                 capture = True
 
         # Process the move
+        squares = self._get_origin_squares(piece, destination, capture)
+        use_origin_rank = False
+        use_origin_file = False
 
+        if len(squares) == 0:
+            return False
+        elif len(squares) > 1:
+            # Filter squares if needed
+            ranks = []
+            files = []
+            duplicate_ranks = False
+            duplicate_files = False
+            for square in squares:
+                if square.rank in ranks:
+                    duplicate_ranks = True
+                else:
+                    ranks.append(square.rank)
+
+                if square.file in files:
+                    duplicate_files = True
+                else:
+                    files.append(square.file)
+
+                if origin_file and origin_file != square.file:
+                    squares.remove(square)
+                if origin_rank and origin_rank != square.rank:
+                    squares.remove(square)
+
+            if not duplicate_files:
+                use_origin_file = True
+            elif not duplicate_ranks:
+                use_origin_rank = True
+            else:
+                use_origin_file = True
+                use_origin_rank = True
+
+        if len(squares) != 1:
+            return False
+
+        origin = squares[0]
+
+        old_board = self._board_position.copy()
+        self._move_piece(origin, destination)
+        if self._king_is_in_check(self.get_color_to_move()):
+            # Move puts king in check and is invalid. Undo move
+            self._board_position = old_board
+            return False
+
+        # Update castling ability if applicable
+        if origin.file == 0 and origin.rank == 0:
+            self._white_can_castle_queenside = False
+        elif origin.file == 7 and origin.rank == 0:
+            self._white_can_castle_kingside = False
+        elif origin.file == 0 and origin.rank == 7:
+            self._black_can_castle_queenside = False
+        elif origin.file == 7 and origin.rank == 7:
+            self._black_can_castle_kingside = False
+        if piece == "K":
+            if self.get_color_to_move() == "white":
+                self._white_can_castle_kingside = False
+                self._white_can_castle_queenside = False
+            else:
+                self._black_can_castle_kingside = False
+                self._black_can_castle_queenside = False
+
+        self._current_move += 1
+
+        check = self._king_is_in_check("black" if self.get_color_to_move() == "white" else "white")
+
+        # get the text representation of the move
+        last_move = ""
         if piece == "p":
-            return self._move_pawn(file, rank, capture, origin_file)
-        elif piece == "R":
-            return self._move_rook(file, rank, origin_file, origin_rank)
-        elif piece == "N":
-            return self._move_knight(file, rank, origin_file, origin_rank)
-        elif piece == "B":
-            return self._move_bishop(file, rank, origin_file, origin_rank)
-        elif piece == "K":
-            return self._move_king(file, rank)
-        elif piece == "Q":
-            return self._move_queen(file, rank, origin_file, origin_rank)
+            if capture:
+                last_move += "abcdefgh"[origin_file]
+        else:
+            move += piece
+            if use_origin_file:
+                last_move += "abcdefgh"[origin_file]
+            if use_origin_rank:
+                last_move += "12345678"[origin_rank]
+
+        if capture:
+            last_move += "x"
+
+        last_move += destination.to_string()
+        if check:
+            last_move += "+"
+        if comment:
+            last_move += comment
+        self._last_move = last_move
+        return True
 
     def get_move_number(self):
         if self._current_move % 2 == 0:
@@ -124,6 +207,165 @@ class MoveValidator:
 
     def get_color_to_move(self):
         return "black" if self._current_move % 2 == 0 else "white"
+
+    # Placeholder function
+    def _king_is_in_check(self, color):
+        # Find the king
+        king = color[0] + "K"
+        square = None
+        for rank in range(0, 8):
+            for file in range(0, 8):
+                if self._board_position[rank][file] == king:
+                    square = Square(file, rank)
+                    break
+
+        return self._square_is_in_check(color, square)
+
+    # Placeholder function
+    def _square_is_in_check(self, color, square):
+        return False
+
+    # Placeholder function
+    def _get_origin_squares(self, piece, destination, capture):
+        return [Square("a4")]
+
+    def _castle_kingside(self):
+        color = self.get_color_to_move()
+        if color == "white":
+            if not self._white_can_castle_kingside:
+                return False
+            if not self._open_path(Square("h1"), Square("e1")):
+                return False
+            if (self._square_is_in_check("white", Square("e1"))
+                    or self._square_is_in_check("white", Square("f1"))
+                    or self._square_is_in_check("white", Square("g1"))):
+                return False
+
+            self._move_piece(Square("h1"), Square("f1"))  # Rook
+            self._move_piece(Square("e1"), Square("g1"))  # King
+            self._white_can_castle_kingside = False
+            self._white_can_castle_queenside = False
+        else:
+            if not self._black_can_castle_kingside:
+                return False
+            if not self._open_path(Square("h8"), Square("e8")):
+                return False
+            if (self._square_is_in_check("black", Square("e8"))
+                    or self._square_is_in_check("black", Square("f8"))
+                    or self._square_is_in_check("black", Square("g8"))):
+                return False
+
+            self._move_piece(Square("h8"), Square("f8"))  # Rook
+            self._move_piece(Square("e8"), Square("g8"))  # King
+            self._black_can_castle_kingside = False
+            self._black_can_castle_queenside = False
+        self._current_move += 1
+        return True
+
+    def _castle_queenside(self):
+        color = self.get_color_to_move()
+        if color == "white":
+            if not self._white_can_castle_queenside:
+                return False
+            if not self._open_path(Square("a1"), Square("e1")):
+                return False
+            if (self._square_is_in_check("white", Square("e1"))
+                    or self._square_is_in_check("white", Square("d1"))
+                    or self._square_is_in_check("white", Square("c1"))):
+                return False
+
+            self._move_piece(Square("a1"), Square("d1"))  # Rook
+            self._move_piece(Square("e1"), Square("c1"))  # King
+            self._white_can_castle_kingside = False
+            self._white_can_castle_queenside = False
+        else:
+            if not self._white_can_castle_queenside:
+                return False
+            if not self._open_path(Square("a8"), Square("e8")):
+                return False
+            if (self._square_is_in_check("black", Square("e8"))
+                    or self._square_is_in_check("black", Square("d8"))
+                    or self._square_is_in_check("black", Square("c8"))):
+                return False
+
+            self._move_piece(Square("a8"), Square("d8"))  # Rook
+            self._move_piece(Square("e8"), Square("c8"))  # King
+            self._black_can_castle_kingside = False
+            self._black_can_castle_queenside = False
+        self._current_move += 1
+        return True
+
+    def _open_path(self, square1, square2):
+        f1 = square1.file
+        r1 = square1.rank
+        f2 = square2.file
+        r2 = square2.rank
+
+        if f1 == f2:
+            # vertical movement
+            if r1 < r2:
+                for rank in range(r1 + 1, r2):
+                    if self._board_position[rank][f1] is not None:
+                        return False
+            else:
+                for rank in range(r2 + 1, r1):
+                    if self._board_position[rank][f1] is not None:
+                        return False
+
+        elif r1 == r2:
+            # horizontal movement
+            if r1 < r2:
+                for file in range(f1 + 1, f2):
+                    if self._board_position[r1][file] is not None:
+                        return False
+            else:
+                for file in range(f2 + 1, f1):
+                    if self._board_position[r1][file] is not None:
+                        return False
+
+        else:
+            # diagonal movement
+            if f1 < f2:
+                for offset in range(1, f2 - f1):
+                    if r1 < r2:
+                        if self._board_position[r1 + offset][f1 + offset] is not None:
+                            return False
+                    else:
+                        if self._board_position[r1 - offset][f1 + offset] is not None:
+                            return False
+            else:
+                for offset in range(1, f1 - f2):
+                    if r1 < r2:
+                        if self._board_position[r1 + offset][f1 - offset] is not None:
+                            return False
+                    else:
+                        if self._board_position[r1 - offset][f1 - offset] is not None:
+                            return False
+
+        return True
+
+    def _move_piece(self, origin, destination):
+        if destination is None:
+            self._board_position[origin.rank][origin.file] = None
+            return
+
+        self._board_position[destination.rank][destination.file] = self._board_position[origin.rank][origin.file]
+        self._board_position[origin.rank][origin.file] = None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def _move_pawn(self, new_file, new_rank, capture, origin_file):
         rank = self._get_index(new_rank)
@@ -328,55 +570,6 @@ class MoveValidator:
 
         return False
 
-    def _castle_kingside(self):
-        color = self.get_color_to_move()
-        if color == "white":
-            if not self._white_can_castle_kingside:
-                return False
-            if not self._open_path(4, 0, 7, 0):
-                return False
-
-            self._update_board(7, 0, 5, 0)  # Rook
-            self._update_board(4, 0, 6, 0)  # King
-            self._white_can_castle_kingside = False
-            self._white_can_castle_queenside = False
-        else:
-            if not self._black_can_castle_kingside:
-                return False
-            if not self._open_path(4, 7, 7, 7):
-                return False
-
-            self._update_board(7, 7, 5, 7)  # Rook
-            self._update_board(4, 7, 6, 7)  # King
-            self._black_can_castle_kingside = False
-            self._black_can_castle_queenside = False
-        self._current_move += 1
-        return True
-
-    def _castle_queenside(self):
-        color = self.get_color_to_move()
-        if color == "white":
-            if not self._white_can_castle_queenside:
-                return False
-            if not self._open_path(0, 0, 4, 0):
-                return False
-
-            self._update_board(0, 0, 3, 0)  # Rook
-            self._update_board(4, 0, 2, 0)  # King
-            self._white_can_castle_kingside = False
-            self._white_can_castle_queenside = False
-        else:
-            if not self._white_can_castle_queenside:
-                return False
-            if not self._open_path(0, 7, 4, 7):
-                return False
-
-            self._update_board(7, 0, 7, 3)  # Rook
-            self._update_board(7, 4, 7, 2)  # King
-            self._black_can_castle_kingside = False
-            self._black_can_castle_queenside = False
-        self._current_move += 1
-        return True
 
     def _move_queen(self, new_file, new_rank, origin_file, origin_rank):
         rank = self._get_index(new_rank)
@@ -418,57 +611,27 @@ class MoveValidator:
 
         return False
 
-    @staticmethod
-    def _get_index(value: str) -> int:
-        if value in "abcdefgh":
-            return "abcdefgh".find(value)
-        else:
-            return "12345678".find(value)
 
-    def _open_path(self, f1, r1, f2, r2):
-        if f1 == f2:
-            # vertical movement
-            if r1 < r2:
-                for rank in range(r1 + 1, r2):
-                    if self._board_position[rank][f1] is not None:
-                        return False
-            else:
-                for rank in range(r2 + 1, r1):
-                    if self._board_position[rank][f1] is not None:
-                        return False
 
-        elif r1 == r2:
-            # horizontal movement
-            if r1 < r2:
-                for file in range(f1 + 1, f2):
-                    if self._board_position[r1][file] is not None:
-                        return False
-            else:
-                for file in range(f2 + 1, f1):
-                    if self._board_position[r1][file] is not None:
-                        return False
 
-        else:
-            # diagonal movement
-            if f1 < f2:
-                for offset in range(1, f2 - f1):
-                    if r1 < r2:
-                        if self._board_position[r1 + offset][f1 + offset] is not None:
-                            return False
-                    else:
-                        if self._board_position[r1 - offset][f1 + offset] is not None:
-                            return False
-            else:
-                for offset in range(1, f1 - f2):
-                    if r1 < r2:
-                        if self._board_position[r1 + offset][f1 - offset] is not None:
-                            return False
-                    else:
-                        if self._board_position[r1 - offset][f1 - offset] is not None:
-                            return False
 
-        return True
 
-    def _update_board(self, f1, r1, f2, r2):
-        self._board_position[r2][f2] = self._board_position[r1][f1]
-        self._board_position[r1][f1] = None
+
+
+class Square:
+    file = None
+    rank = None
+
+    def __init__(self, file: int, rank: int):
+        self.rank = rank
+        self.file = file
+
+    def __init__(self, square: str):
+        self.file = "abcdefgh".find(square[0])
+        self.rank = "12345678".find(square[1])
+        if self.rank < 0 or self.file < 0:
+            raise ValueError('Invalid square')
+
+    def to_string(self) -> str:
+        return "abcdefgh"[self.file] + "12345678"[self.rank]
+
