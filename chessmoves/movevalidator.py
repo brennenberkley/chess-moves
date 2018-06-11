@@ -225,9 +225,105 @@ class MoveValidator:
     def _square_is_in_check(self, color, square):
         return False
 
-    # Placeholder function
     def _get_origin_squares(self, piece, destination, capture):
-        return [Square("a4")]
+        valid_squares = []
+        possible_squares = []
+        color = self.get_color_to_move()
+
+        if piece == "p":
+            if capture:
+                if color == 'white':
+                    if destination.file > 0 and destination.rank > 0:
+                        possible_squares.append(Square(destination.file - 1, destination.rank - 1))
+                    if destination.file < 7 and destination.rank > 0:
+                        possible_squares.append(Square(destination.file + 1, destination.rank - 1))
+                else:
+                    if destination.file > 0 and destination.rank < 7:
+                        possible_squares.append(Square(destination.file - 1, destination.rank + 1))
+                    if destination.file < 7 and destination.rank < 7:
+                        possible_squares.append(Square(destination.file + 1, destination.rank + 1))
+            else:
+                if color == 'white':
+                    if destination.rank > 0:
+                        possible_squares.append(Square(destination.file, destination.rank - 1))
+                    if destination.rank == 3:
+                        possible_squares.append(Square(destination.file, destination.rank - 2))
+                else:
+                    if destination.rank < 7:
+                        possible_squares.append(Square(destination.file, destination.rank + 1))
+                    if destination.rank == 4:
+                        possible_squares.append(Square(destination.file, destination.rank + 2))
+        if piece == "N":
+            offsets = [
+                [+1, +2],
+                [+1, -2],
+                [-1, +2],
+                [-1, -2],
+                [+2, +1],
+                [+2, -1],
+                [-2, +1],
+                [-2, -1]
+            ]
+            for offset in offsets:
+                try:
+                    square = Square(destination.file + offset[0], destination.rank + offset[1])
+                    possible_squares.append(square)
+                except ValueError:
+                    continue
+        if piece == "K":
+            offsets = [
+                [1, 1],
+                [1, 0],
+                [1, -1],
+                [0, 1],
+                [0, -1],
+                [-1, 1],
+                [-1, 0],
+                [-1, -1]
+            ]
+            for offset in offsets:
+                try:
+                    square = Square(destination.file + offset[0], destination.rank + offset[1])
+                    possible_squares.append(square)
+                except ValueError:
+                    continue
+        if piece == "Q" or piece == "B":
+            for offset in range(-7, 8):
+                try:
+                    square = Square(destination.file + offset, destination.rank + offset)
+                    possible_squares.append(square)
+                except ValueError:
+                    pass
+                try:
+                    square = Square(destination.file + offset, destination.rank - offset)
+                    possible_squares.append(square)
+
+                except ValueError:
+                    pass
+        if piece == "Q" or piece == "R":
+            for offset in range(-7, 8):
+                try:
+                    square = Square(destination.file, destination.rank + offset)
+                    possible_squares.append(square)
+                except ValueError:
+                    pass
+                try:
+                    square = Square(destination.file + offset, destination.rank)
+                    possible_squares.append(square)
+                except ValueError:
+                    pass
+
+        # Try each origin square
+        for square in possible_squares:
+            if square == destination:
+                continue
+            if not self._open_path(square, destination) and piece != "N":
+                continue
+
+            if self._board_position[square.rank][square.file] == color[0] + piece:
+                valid_squares.append(square)
+
+        return valid_squares
 
     def _castle_kingside(self):
         color = self.get_color_to_move()
@@ -353,285 +449,24 @@ class MoveValidator:
         self._board_position[origin.rank][origin.file] = None
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def _move_pawn(self, new_file, new_rank, capture, origin_file):
-        rank = self._get_index(new_rank)
-        file = self._get_index(new_file)
-        squares = []
-
-        color = self.get_color_to_move()
-        # Determine valid origin squares
-        if capture:
-            if origin_file is None:
-                return False
-
-            if color == 'white':
-                squares.append([rank - 1, self._get_index(origin_file)])
-            else:
-                squares.append([rank + 1, self._get_index(origin_file)])
-        else:
-            if origin_file:
-                return False
-
-            if color == 'white':
-                squares.append([rank - 1, file])
-                if rank == 3:
-                    squares.append([rank - 2, file])
-            else:
-                squares.append([rank + 1, file])
-                if rank == 4:
-                    squares.append([rank + 2, file])
-
-        # Try each origin square
-        for square in squares:
-            r = square[0]
-            f = square[1]
-            if f < 0 or r < 0 or f > 7 or r > 7:
-                continue
-            if not self._open_path(f, r, file, rank):
-                continue
-
-            if self._board_position[r][f] == color[0] + "p":
-                self._update_board(f, r, file, rank)
-                self._current_move += 1
-                return True
-
-        return False
-
-    def _move_knight(self, new_file, new_rank, origin_file, origin_rank):
-        rank = self._get_index(new_rank)
-        file = self._get_index(new_file)
-        squares = [
-            [rank + 1, file + 2],
-            [rank + 1, file - 2],
-            [rank - 1, file + 2],
-            [rank - 1, file - 2],
-            [rank + 2, file + 1],
-            [rank + 2, file - 1],
-            [rank - 2, file + 1],
-            [rank - 2, file - 1]
-        ]
-        if origin_file:
-            o_file = self._get_index(origin_file)
-            for square in squares:
-                if square[1] != o_file:
-                    squares.remove(square)
-        if origin_rank:
-            o_rank = self._get_index(origin_rank)
-            for square in squares:
-                if square[0] != o_rank:
-                    squares.remove(square)
-
-        color = self.get_color_to_move()
-
-        # Try each origin square
-        for square in squares:
-            r = square[0]
-            f = square[1]
-            if f < 0 or r < 0 or f > 7 or r > 7:
-                continue
-
-            if self._board_position[r][f] == color[0] + "N":
-                self._update_board(f, r, file, rank)
-                self._current_move += 1
-                return True
-
-        return False
-
-    def _move_rook(self, new_file, new_rank, origin_file, origin_rank):
-        rank = self._get_index(new_rank)
-        file = self._get_index(new_file)
-        squares = []
-        color = self.get_color_to_move()
-
-        # Determine valid origin squares
-        for offset in range(-7, 8):
-            squares.append([rank, file + offset])
-            squares.append([rank + offset, file])
-
-        if origin_file:
-            o_file = self._get_index(origin_file)
-            for square in squares:
-                if square[1] != o_file:
-                    squares.remove(square)
-        if origin_rank:
-            o_rank = self._get_index(origin_rank)
-            for square in squares:
-                if square[0] != o_rank:
-                    squares.remove(square)
-
-        # Try each origin square
-        for square in squares:
-            r = square[0]
-            f = square[1]
-            if f < 0 or r < 0 or f > 7 or r > 7:
-                continue
-            if not self._open_path(f, r, file, rank):
-                continue
-
-            if self._board_position[r][f] == color[0] + "R":
-                self._update_board(f, r, file, rank)
-                self._current_move += 1
-                if f == 0 and r == 0:
-                    self._white_can_castle_queenside = False
-                elif f == 7 and r == 0:
-                    self._white_can_castle_kingside = False
-                elif f == 0 and r == 7:
-                    self._black_can_castle_queenside = False
-                elif f == 7 and r == 7:
-                    self._black_can_castle_kingside = False
-                return True
-
-        return False
-
-    def _move_bishop(self, new_file, new_rank, origin_file, origin_rank):
-        rank = self._get_index(new_rank)
-        file = self._get_index(new_file)
-        squares = []
-        color = self.get_color_to_move()
-
-        # Determine valid origin squares
-        for offset in range(-7, 8):
-            squares.append([rank + offset, file + offset])
-            squares.append([rank + offset, file - offset])
-
-        if origin_file:
-            o_file = self._get_index(origin_file)
-            for square in squares:
-                if square[1] != o_file:
-                    squares.remove(square)
-        if origin_rank:
-            o_rank = self._get_index(origin_rank)
-            for square in squares:
-                if square[0] != o_rank:
-                    squares.remove(square)
-
-        # Try each origin square
-        for square in squares:
-            r = square[0]
-            f = square[1]
-            if f < 0 or r < 0 or f > 7 or r > 7:
-                continue
-            if not self._open_path(f, r, file, rank):
-                continue
-
-            if self._board_position[r][f] == color[0] + "B":
-                self._update_board(f, r, file, rank)
-                self._current_move += 1
-                return True
-
-        return False
-
-    def _move_king(self, new_file, new_rank):
-        rank = self._get_index(new_rank)
-        file = self._get_index(new_file)
-        squares = [
-            [rank + 1, file + 1],
-            [rank + 1, file],
-            [rank + 1, file - 1],
-            [rank, file + 1],
-            [rank, file - 1],
-            [rank - 1, file + 1],
-            [rank - 1, file],
-            [rank - 1, file - 1]
-        ]
-        color = self.get_color_to_move()
-
-        # Try each origin square
-        for square in squares:
-            r = square[0]
-            f = square[1]
-            if f < 0 or r < 0 or f > 7 or r > 7:
-                continue
-
-            if self._board_position[r][f] == color[0] + "N":
-                self._update_board(f, r, file, rank)
-                self._current_move += 1
-                if color == "white":
-                    self._white_can_castle_kingside = False
-                    self._white_can_castle_queenside = False
-                else:
-                    self._black_can_castle_kingside = False
-                    self._black_can_castle_queenside = False
-                return True
-
-        return False
-
-
-    def _move_queen(self, new_file, new_rank, origin_file, origin_rank):
-        rank = self._get_index(new_rank)
-        file = self._get_index(new_file)
-        squares = []
-        color = self.get_color_to_move()
-
-        # Determine valid origin squares
-        for offset in range(-7, 8):
-            squares.append([rank, file + offset])
-            squares.append([rank + offset, file])
-            squares.append([rank + offset, file + offset])
-            squares.append([rank + offset, file - offset])
-
-        if origin_file:
-            o_file = self._get_index(origin_file)
-            for square in squares:
-                if square[1] != o_file:
-                    squares.remove(square)
-        if origin_rank:
-            o_rank = self._get_index(origin_rank)
-            for square in squares:
-                if square[0] != o_rank:
-                    squares.remove(square)
-
-        # Try each origin square
-        for square in squares:
-            r = square[0]
-            f = square[1]
-            if f < 0 or r < 0 or f > 7 or r > 7:
-                continue
-            if not self._open_path(f, r, file, rank):
-                continue
-
-            if self._board_position[r][f] == color[0] + "Q":
-                self._update_board(f, r, file, rank)
-                self._current_move += 1
-                return True
-
-        return False
-
-
-
-
-
-
-
-
 class Square:
     file = None
     rank = None
 
-    def __init__(self, file: int, rank: int):
-        self.rank = rank
-        self.file = file
-
-    def __init__(self, square: str):
-        self.file = "abcdefgh".find(square[0])
-        self.rank = "12345678".find(square[1])
-        if self.rank < 0 or self.file < 0:
-            raise ValueError('Invalid square')
+    def __init__(self, *args):
+        if len(args) == 2:
+            self.file = args[0]
+            self.rank = args[1]
+            if self.rank < 0 or self.file < 0 or self.rank > 7 or self.file > 7:
+                raise ValueError('Invalid square')
+        elif len(args) == 1:
+            self.file = "abcdefgh".find(args[0][0])
+            self.rank = "12345678".find(args[0][1])
+            if self.rank < 0 or self.file < 0 or self.rank > 7 or self.file > 7:
+                raise ValueError('Invalid square')
 
     def to_string(self) -> str:
         return "abcdefgh"[self.file] + "12345678"[self.rank]
 
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
