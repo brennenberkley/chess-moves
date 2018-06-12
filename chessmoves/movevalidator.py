@@ -1,3 +1,6 @@
+from copy import deepcopy
+
+
 class MoveValidator:
     _current_move = int(1)
     _white_can_castle_kingside = True
@@ -147,7 +150,7 @@ class MoveValidator:
 
         origin = squares[0]
 
-        old_board = self._board_position.copy()
+        old_board = deepcopy(self._board_position)
         self._move_piece(origin, destination)
         if self._king_is_in_check(self.get_color_to_move()):
             # Move puts king in check and is invalid. Undo move
@@ -173,7 +176,7 @@ class MoveValidator:
 
         self._current_move += 1
 
-        check = self._king_is_in_check("black" if self.get_color_to_move() == "white" else "white")
+        check = self._king_is_in_check(self.get_color_to_move())
 
         # get the text representation of the move
         last_move = ""
@@ -181,7 +184,7 @@ class MoveValidator:
             if capture:
                 last_move += "abcdefgh"[origin_file]
         else:
-            move += piece
+            last_move += piece
             if use_origin_file:
                 last_move += "abcdefgh"[origin_file]
             if use_origin_rank:
@@ -208,7 +211,6 @@ class MoveValidator:
     def get_color_to_move(self):
         return "black" if self._current_move % 2 == 0 else "white"
 
-    # Placeholder function
     def _king_is_in_check(self, color):
         # Find the king
         king = color[0] + "K"
@@ -221,9 +223,75 @@ class MoveValidator:
 
         return self._square_is_in_check(color, square)
 
-    # Placeholder function
     def _square_is_in_check(self, color, square):
+        for rank in range(0, 8):
+            for file in range(0, 8):
+                piece = self._board_position[rank][file]
+                if piece is not None and piece[0] != color[0]:
+                    squares = self._get_attacked_squares(Square(file, rank))
+                    for s in squares:
+                        if s == square:
+                            return True
         return False
+
+    def _get_attacked_squares(self, square):
+        coordinates = []
+        piece = self._board_position[square.rank][square.file]
+        if piece is None:
+            return []
+
+        color = piece[0]
+        piece = piece[1]
+        if piece == "p":
+            if color == "w":
+                coordinates.append(Coordinate(square.file + 1, square.rank + 1))
+                coordinates.append(Coordinate(square.file + 1, square.rank + 1))
+            else:
+                coordinates.append(Coordinate(square.file + 1, square.rank - 1))
+                coordinates.append(Coordinate(square.file + 1, square.rank - 1))
+        if piece == "N":
+            offsets = [
+                [+1, +2],
+                [+1, -2],
+                [-1, +2],
+                [-1, -2],
+                [+2, +1],
+                [+2, -1],
+                [-2, +1],
+                [-2, -1]
+            ]
+            for offset in offsets:
+                    coordinates.append(Coordinate(square.file + offset[0], square.rank + offset[1]))
+        if piece == "K":
+            offsets = [
+                [1, 1],
+                [1, 0],
+                [1, -1],
+                [0, 1],
+                [0, -1],
+                [-1, 1],
+                [-1, 0],
+                [-1, -1]
+            ]
+            for offset in offsets:
+                    coordinates.append(Coordinate(square.file + offset[0], square.rank + offset[1]))
+        if piece == "Q" or piece == "B":
+            for offset in range(-7, 8):
+                coordinates.append(Coordinate(square.file + offset, square.rank + offset))
+                coordinates.append(Coordinate(square.file + offset, square.rank - offset))
+        if piece == "Q" or piece == "R":
+            for offset in range(-7, 8):
+                coordinates.append(Coordinate(square.file, square.rank + offset))
+                coordinates.append(Coordinate(square.file + offset, square.rank))
+        squares = []
+        for coordinate in coordinates:
+            try:
+                attacked_square = Square(coordinate.file, coordinate.rank)
+                if self._open_path(square, attacked_square or piece == "N"):
+                    squares.append(attacked_square)
+            except ValueError:
+                continue
+        return squares
 
     def _get_origin_squares(self, piece, destination, capture):
         valid_squares = []
@@ -467,6 +535,17 @@ class Square:
 
     def to_string(self) -> str:
         return "abcdefgh"[self.file] + "12345678"[self.rank]
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+class Coordinate:
+    file = None
+    rank = None
+
+    def __init__(self, file, rank):
+            self.file = file
+            self.rank = rank
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
