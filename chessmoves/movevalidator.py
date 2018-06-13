@@ -7,6 +7,8 @@ class MoveValidator:
     _white_can_castle_queenside = True
     _black_can_castle_kingside = True
     _black_can_castle_queenside = True
+    _white_can_ep_file = None
+    _black_can_ep_file = None
     _last_move = ""
 
     # First letter indicates color, second letter indicates piece
@@ -58,6 +60,9 @@ class MoveValidator:
         move = move.replace("!", "")
         move = move.replace("+", "")
         move = move.replace("#", "")
+        move = move.replace("e.p.", "")
+        move = move.replace("ep.", "")
+        move = move.replace("ep", "")
         move = move.replace(" ", "")
 
         # Handle special cases
@@ -88,6 +93,21 @@ class MoveValidator:
         if len(move) == 1:
             if move in "abcdefgh":
                 origin_file = "abcdefgh".find(move)
+                # Check if the move was en passant
+                if self.get_color_to_move() == "white":
+                    if destination.file == self._white_can_ep_file and destination.rank == 5:
+                        self._move_piece(Square(origin_file, 4), destination)
+                        self._move_piece(Square(destination.file, 4), None)
+                        self._last_move = "abcdefgh"[origin_file] + "5x" + "abcdefgh"[destination.file] + "6e.p."
+                        self._current_move += 1;
+                        return True
+                else:
+                    if destination.file == self._black_can_ep_file and destination.rank == 2:
+                        self._move_piece(Square(origin_file, 5), destination)
+                        self._move_piece(Square(destination.file, 5), None)
+                        self._last_move = "abcdefgh"[origin_file] + "4x" + "abcdefgh"[destination.file] + "3e.p."
+                        self._current_move += 1;
+                        return True
             elif move in "12345678":
                 origin_rank = "12345678".find(move)
             else:
@@ -174,6 +194,14 @@ class MoveValidator:
                 self._black_can_castle_kingside = False
                 self._black_can_castle_queenside = False
 
+        if self.get_color_to_move() == "white":
+            self._white_can_ep_file = None
+            if piece == "p" and destination.rank - origin.rank == 2:
+                self._black_can_ep_file = destination.file
+        else:
+            self._black_can_ep_file = None
+            if piece == "p" and destination.rank - origin.rank == -2:
+                self._white_can_ep_file = destination.file
         self._current_move += 1
 
         check = self._king_is_in_check(self.get_color_to_move())
@@ -424,6 +452,7 @@ class MoveValidator:
             self._black_can_castle_kingside = False
             self._black_can_castle_queenside = False
         self._current_move += 1
+        self._last_move = "O-O"
         return True
 
     def _castle_queenside(self):
@@ -457,6 +486,7 @@ class MoveValidator:
             self._black_can_castle_kingside = False
             self._black_can_castle_queenside = False
         self._current_move += 1
+        self._last_move = "O-O-O"
         return True
 
     def _open_path(self, square1, square2):
@@ -538,6 +568,7 @@ class Square:
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
+
 
 class Coordinate:
     file = None
