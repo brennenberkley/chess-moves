@@ -13,12 +13,12 @@ class MoveValidator:
     _all_moves = []
 
     # Game metadata
-    _event = None
-    _date = None
-    _site = None
-    _round = None
     _white_player = None
     _black_player = None
+    _event = None
+    _site = None
+    _date = None
+    _round = None
 
 
     # First letter indicates color, second letter indicates piece
@@ -33,6 +33,15 @@ class MoveValidator:
         ["bp", "bp", "bp", "bp", "bp", "bp", "bp", "bp"],  # 7
         ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"]   # 8
     ]
+
+    def __init__(self, white, black, event, date, site, round):
+        self._white_player = white
+        self._black_player = black
+        self.event = event
+        self.date = date
+        self.site = site
+        self.round = round
+
 
     def get_board_position(self):
         board = "  +----+----+----+----+----+----+----+----+\n"
@@ -254,16 +263,17 @@ class MoveValidator:
 
         file = FileHelper(file_name)
 
-        # Save the game's metadata
-        self._white_player = "Brennen Berkley"
-        self._black_player = "Sandoval, Anthony"
-
         result = "*"
 
-        file.write("[Date \"?\"]\n")
-        file.write("[Event \"?\"]\n")
-        file.write("[Round \"?\"]\n")
-        file.write("[Site \"?\"]\n")
+        if self.date is None or self.date == "": self.date = "?"
+        if self.event is None or self.event == "": self.event = "?"
+        if self.round is None or self.round == "": self.round = "?"
+        if self.site is None or self.site == "": self.site = "?"
+
+        file.write("[Date \"" + self.date + "\"]\n")
+        file.write("[Event \"" + self.event +  "\"]\n")
+        file.write("[Round \"" + self.round + "\"]\n")
+        file.write("[Site \"" + self.site + "\"]\n")
         file.write("[White \"" + self._white_player + "\"]\n")
         file.write("[Black \"" + self._black_player + "\"]\n")
         file.write("[Result \"" + result + "\"]\n\n")
