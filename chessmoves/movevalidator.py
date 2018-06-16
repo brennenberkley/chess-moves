@@ -1,4 +1,5 @@
 from copy import deepcopy
+from .filehelper import FileHelper
 
 
 class MoveValidator:
@@ -9,7 +10,16 @@ class MoveValidator:
     _black_can_castle_queenside = True
     _white_can_ep_file = None
     _black_can_ep_file = None
-    _last_move = ""
+    _all_moves = []
+
+    # Game metadata
+    _event = None
+    _date = None
+    _site = None
+    _round = None
+    _white_player = None
+    _black_player = None
+
 
     # First letter indicates color, second letter indicates piece
     _board_position = [
@@ -39,7 +49,7 @@ class MoveValidator:
         return board
 
     def get_last_move(self):
-        return self._last_move
+        return self._all_moves[self._all_moves.count - 1]
 
     def add_move(self, move_input):
         move = move_input
@@ -98,15 +108,15 @@ class MoveValidator:
                     if destination.file == self._white_can_ep_file and destination.rank == 5:
                         self._move_piece(Square(origin_file, 4), destination)
                         self._move_piece(Square(destination.file, 4), None)
-                        self._last_move = "abcdefgh"[origin_file] + "5x" + "abcdefgh"[destination.file] + "6e.p."
-                        self._current_move += 1;
+                        self._all_moves.append("abcdefgh"[origin_file] + "5x" + "abcdefgh"[destination.file] + "6e.p.")
+                        self._current_move += 1
                         return True
                 else:
                     if destination.file == self._black_can_ep_file and destination.rank == 2:
                         self._move_piece(Square(origin_file, 5), destination)
                         self._move_piece(Square(destination.file, 5), None)
-                        self._last_move = "abcdefgh"[origin_file] + "4x" + "abcdefgh"[destination.file] + "3e.p."
-                        self._current_move += 1;
+                        self._all_moves.append("abcdefgh"[origin_file] + "4x" + "abcdefgh"[destination.file] + "3e.p.")
+                        self._current_move += 1
                         return True
             elif move in "12345678":
                 origin_rank = "12345678".find(move)
@@ -226,7 +236,7 @@ class MoveValidator:
             last_move += "+"
         if comment:
             last_move += comment
-        self._last_move = last_move
+        self._all_moves.append(last_move)
         return True
 
     def get_move_number(self):
@@ -238,6 +248,34 @@ class MoveValidator:
 
     def get_color_to_move(self):
         return "black" if self._current_move % 2 == 0 else "white"
+
+    def save_game(self, location):
+        file_name = location.rstrip('/') + '/' + 'game.pgn'
+
+        file = FileHelper(file_name)
+
+        # Save the game's metadata
+        self._white_player = "Brennen Berkley"
+        self._black_player = "Sandoval, Anthony"
+
+        result = "*"
+
+        file.write("[Date \"?\"]\n")
+        file.write("[Event \"?\"]\n")
+        file.write("[Round \"?\"]\n")
+        file.write("[Site \"?\"]\n")
+        file.write("[White \"" + self._white_player + "\"]\n")
+        file.write("[Black \"" + self._black_player + "\"]\n")
+        file.write("[Result \"" + result + "\"]\n\n")
+
+        # Save the moves
+        for i in range(0, len(self._all_moves), 2):
+            move_number = int(i / 2 + 1)
+            file.write(str(move_number) + ". ")
+            file.write(self._all_moves[i] + " ")
+            if i + 1 < len(self._all_moves):
+                file.write(self._all_moves[i + 1] + " ")
+        file.write(result + "\n")
 
     def _king_is_in_check(self, color):
         # Find the king
@@ -452,7 +490,7 @@ class MoveValidator:
             self._black_can_castle_kingside = False
             self._black_can_castle_queenside = False
         self._current_move += 1
-        self._last_move = "O-O"
+        self._all_moves.append("O-O")
         return True
 
     def _castle_queenside(self):
@@ -486,7 +524,7 @@ class MoveValidator:
             self._black_can_castle_kingside = False
             self._black_can_castle_queenside = False
         self._current_move += 1
-        self._last_move = "O-O-O"
+        self._all_moves.append("O-O-O")
         return True
 
     def _open_path(self, square1, square2):
