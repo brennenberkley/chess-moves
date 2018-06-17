@@ -25,7 +25,7 @@ def main():
     while True:
         move = input(validator.get_move_number() + " ")
 
-        if move == "save":
+        if move.lower() in ["save", "s"]:
             folder = input("Save location: ")
 
             result = ""
