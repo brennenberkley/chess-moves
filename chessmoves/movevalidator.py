@@ -20,7 +20,6 @@ class MoveValidator:
     _date = None
     _round = None
 
-
     # First letter indicates color, second letter indicates piece
     _board_position = [
         #  A     B     C     D     E     F     G     H
@@ -34,14 +33,13 @@ class MoveValidator:
         ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"]   # 8
     ]
 
-    def __init__(self, white, black, event, date, site, round):
+    def __init__(self, white, black, event, date, site, round_num):
         self._white_player = white
         self._black_player = black
         self.event = event
         self.date = date
         self.site = site
-        self.round = round
-
+        self.round = round_num
 
     def get_board_position(self):
         board = "  +----+----+----+----+----+----+----+----+\n"
@@ -62,6 +60,7 @@ class MoveValidator:
 
     def add_move(self, move_input):
         move = move_input
+        move_is_mate = "#" in move
 
         comment = None
         # strip off extra symbols
@@ -242,7 +241,10 @@ class MoveValidator:
 
         last_move += destination.to_string()
         if check:
-            last_move += "+"
+            if move_is_mate:
+                last_move += "#"
+            else:
+                last_move += "+"
         if comment:
             last_move += comment
         self._all_moves.append(last_move)
@@ -263,16 +265,20 @@ class MoveValidator:
 
         file = FileHelper(file_name)
 
-        if (result not in ["1-0", "0-1", "1/2-1/2"]):
+        if result not in ["1-0", "0-1", "1/2-1/2"]:
             result = "*"
 
-        if self.date is None or self.date == "": self.date = "?"
-        if self.event is None or self.event == "": self.event = "?"
-        if self.round is None or self.round == "": self.round = "?"
-        if self.site is None or self.site == "": self.site = "?"
+        if self.date is None or self.date == "":
+            self.date = "?"
+        if self.event is None or self.event == "":
+            self.event = "?"
+        if self.round is None or self.round == "":
+            self.round = "?"
+        if self.site is None or self.site == "":
+            self.site = "?"
 
         file.write("[Date \"" + self.date + "\"]\n")
-        file.write("[Event \"" + self.event +  "\"]\n")
+        file.write("[Event \"" + self.event + "\"]\n")
         file.write("[Round \"" + self.round + "\"]\n")
         file.write("[Site \"" + self.site + "\"]\n")
         file.write("[White \"" + self._white_player + "\"]\n")
