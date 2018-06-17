@@ -258,12 +258,13 @@ class MoveValidator:
     def get_color_to_move(self):
         return "black" if self._current_move % 2 == 0 else "white"
 
-    def save_game(self, location):
+    def save_game(self, location, result):
         file_name = location.rstrip('/') + '/' + 'game.pgn'
 
         file = FileHelper(file_name)
 
-        result = "*"
+        if (result not in ["1-0", "0-1", "1/2-1/2"]):
+            result = "*"
 
         if self.date is None or self.date == "": self.date = "?"
         if self.event is None or self.event == "": self.event = "?"

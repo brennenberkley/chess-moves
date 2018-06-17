@@ -27,7 +27,8 @@ def main():
 
         if move == "save":
             folder = input("Save location: ")
-            validator.save_game(folder)
+            result = input("Result: ").strip().strip()
+            validator.save_game(folder, result)
             break
 
         if not validator.add_move(move):
